@@ -1,8 +1,18 @@
-document.addEventListener("DOMContentLoaded", () => {
+ document.addEventListener("DOMContentLoaded", () => {
   const activitiesList = document.getElementById("activities-list");
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+
+  // Helper to escape HTML in participant emails
+  function escapeHtml(str) {
+    return str
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
 
   // Function to fetch activities from API
   async function fetchActivities() {
@@ -15,25 +25,61 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
-        const activityCard = document.createElement("div");
-        activityCard.className = "activity-card";
+        // Create activity card
+        const card = document.createElement("div");
+        card.className = "activity-card";
 
-        const spotsLeft = details.max_participants - details.participants.length;
+        const title = document.createElement("h4");
+        title.textContent = name;
+        card.appendChild(title);
 
-        activityCard.innerHTML = `
-          <h4>${name}</h4>
-          <p>${details.description}</p>
-          <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
-        `;
+        const desc = document.createElement("p");
+        desc.textContent = details.description;
+        card.appendChild(desc);
 
-        activitiesList.appendChild(activityCard);
+        const schedule = document.createElement("p");
+        schedule.innerHTML = `<strong>Schedule:</strong> ${escapeHtml(details.schedule)}`;
+        card.appendChild(schedule);
 
-        // Add option to select dropdown
-        const option = document.createElement("option");
-        option.value = name;
-        option.textContent = name;
-        activitySelect.appendChild(option);
+        const spots = document.createElement("p");
+        const taken = details.participants ? details.participants.length : 0;
+        spots.innerHTML = `<strong>Spots:</strong> ${taken} / ${details.max_participants}`;
+        card.appendChild(spots);
+
+        // Participants section (styled)
+        const participantsWrap = document.createElement("div");
+        participantsWrap.className = "participants";
+
+        const participantsTitle = document.createElement("h5");
+        participantsTitle.textContent = "Participants";
+        participantsWrap.appendChild(participantsTitle);
+
+        if (details.participants && details.participants.length > 0) {
+          const ul = document.createElement("ul");
+          ul.className = "participants-list";
+          details.participants.forEach((p) => {
+            const li = document.createElement("li");
+            li.innerHTML = `<span class="participant">${escapeHtml(p)}</span>`;
+            ul.appendChild(li);
+          });
+          participantsWrap.appendChild(ul);
+        } else {
+          const none = document.createElement("p");
+          none.className = "info small";
+          none.textContent = "No participants yet";
+          participantsWrap.appendChild(none);
+        }
+
+        card.appendChild(participantsWrap);
+
+        activitiesList.appendChild(card);
+
+        // Add option to select for signup (mark as dynamic so we can refresh)
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        opt.className = "dynamic";
+        activitySelect.appendChild(opt);
       });
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
