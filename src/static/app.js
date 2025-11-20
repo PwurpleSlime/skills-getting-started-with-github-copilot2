@@ -22,6 +22,8 @@
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      // Remove previously-added dynamic options from the select so we don't duplicate them on refresh
+      Array.from(activitySelect.querySelectorAll('option.dynamic')).forEach(o => o.remove());
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -59,8 +61,44 @@
           ul.className = "participants-list";
           details.participants.forEach((p) => {
             const li = document.createElement("li");
-            li.innerHTML = `<span class="participant">${escapeHtml(p)}</span>`;
+            // Participant chip + delete button
+            li.innerHTML = `
+              <span class="participant">${escapeHtml(p)}</span>
+              <button class="participant-delete" aria-label="Remove ${escapeHtml(p)}" data-activity="${escapeHtml(name)}" data-email="${escapeHtml(p)}">✕</button>
+            `;
             ul.appendChild(li);
+
+            // Attach click handler to the delete button
+            // (find it on the just-created list item)
+            const btn = li.querySelector('.participant-delete');
+            btn.addEventListener('click', async (e) => {
+              e.preventDefault();
+              // Confirm action briefly (optional)
+              if (!confirm(`Remove ${p} from ${name}?`)) return;
+
+              try {
+                const res = await fetch(`/activities/${encodeURIComponent(name)}/signup?email=${encodeURIComponent(p)}`, {
+                  method: 'DELETE',
+                });
+                const result = await res.json();
+                if (res.ok) {
+                  messageDiv.textContent = result.message;
+                  messageDiv.className = 'success';
+                  // Refresh list
+                  fetchActivities();
+                } else {
+                  messageDiv.textContent = result.detail || 'Failed to remove participant';
+                  messageDiv.className = 'error';
+                }
+              } catch (err) {
+                console.error('Error removing participant:', err);
+                messageDiv.textContent = 'Failed to remove participant';
+                messageDiv.className = 'error';
+              }
+
+              messageDiv.classList.remove('hidden');
+              setTimeout(() => messageDiv.classList.add('hidden'), 4000);
+            });
           });
           participantsWrap.appendChild(ul);
         } else {
@@ -108,6 +146,7 @@
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities(); // Refresh the activities list
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
